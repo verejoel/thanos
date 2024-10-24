@@ -103,7 +103,7 @@ type TransportConfig struct {
 var defaultTransportConfig TransportConfig = TransportConfig{
 	MaxIdleConns:          100,
 	MaxIdleConnsPerHost:   2,
-	ResponseHeaderTimeout: 0,
+	ResponseHeaderTimeout: int64(10 * time.Second),
 	MaxConnsPerHost:       0,
 	IdleConnTimeout:       int64(90 * time.Second),
 	ExpectContinueTimeout: int64(10 * time.Second),
