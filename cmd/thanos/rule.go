@@ -797,10 +797,26 @@ func runRule(
 		}
 
 		router.Post("/-/reload", func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
 			reloadMsg := make(chan error)
-			reloadWebhandler <- reloadMsg
-			if err := <-reloadMsg; err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			select {
+			case <-ctx.Done():
+				// http.Error(w, context.Canceled.Error(), http.StatusInternalServerError)
+				level.Warn(logger).Log("msg", "reload send cancelled", "err", context.Canceled.Error())
+				return
+			case reloadWebhandler <- reloadMsg:
+				select {
+				case <-ctx.Done():
+					// http.Error(w, context.Canceled.Error(), http.StatusInternalServerError)
+					level.Warn(logger).Log("msg", "reload receive cancelled", "err", context.Canceled.Error())
+					return
+				case err := <-reloadMsg:
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					}
+				}
 			}
 		})
 
