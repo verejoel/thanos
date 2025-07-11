@@ -33,6 +33,7 @@ type promClientsQueryable struct {
 	promClients       []*promclient.Client
 	queryClients      []*clientconfig.HTTPClient
 	ignoredLabelNames []string
+	deduplicate       bool
 
 	duplicatedQuery prometheus.Counter
 }
@@ -45,6 +46,7 @@ type promClientsQuerier struct {
 	promClients         []*promclient.Client
 	queryClients        []*clientconfig.HTTPClient
 	restoreIgnoreLabels []string
+	deduplicate         bool
 
 	// We use a dummy counter here because the duplicated
 	// addresses are already tracked by rule evaluation part.
@@ -53,7 +55,7 @@ type promClientsQuerier struct {
 
 // NewPromClientsQueryable creates a queryable that queries queriers from Prometheus clients.
 func NewPromClientsQueryable(logger log.Logger, queryClients []*clientconfig.HTTPClient, promClients []*promclient.Client,
-	httpMethod string, step time.Duration, ignoredLabelNames []string) *promClientsQueryable {
+	httpMethod string, step time.Duration, ignoredLabelNames []string, deduplicate bool) *promClientsQueryable {
 	return &promClientsQueryable{
 		logger:            logger,
 		queryClients:      queryClients,
@@ -62,6 +64,7 @@ func NewPromClientsQueryable(logger log.Logger, queryClients []*clientconfig.HTT
 		httpMethod:        httpMethod,
 		step:              step,
 		ignoredLabelNames: ignoredLabelNames,
+		deduplicate:       deduplicate,
 	}
 }
 
@@ -76,6 +79,7 @@ func (q *promClientsQueryable) Querier(mint, maxt int64) (storage.Querier, error
 		queryClients:        q.queryClients,
 		promClients:         q.promClients,
 		restoreIgnoreLabels: q.ignoredLabelNames,
+		deduplicate:         q.deduplicate,
 	}, nil
 }
 
@@ -88,7 +92,7 @@ func (q *promClientsQuerier) Select(ctx context.Context, _ bool, _ *storage.Sele
 		endpoints := RemoveDuplicateQueryEndpoints(q.logger, q.duplicatedQuery, q.queryClients[i].Endpoints())
 		for _, i := range rand.Perm(len(endpoints)) {
 			m, warns, _, err := promClient.QueryRange(ctx, endpoints[i], query, q.mint, q.maxt, q.step, promclient.QueryOptions{
-				Deduplicate: true,
+				Deduplicate: q.deduplicate,
 				Method:      q.httpMethod,
 			})
 
